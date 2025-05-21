@@ -253,4 +253,4 @@ The search endpoint supports:
 
 ## License
 
-MIT 
+@Vedant Sase
