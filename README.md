@@ -1,12 +1,12 @@
 # Book Review API
-  <!-- Documentation is made using AI tools  -->
+
 A RESTful API for managing book reviews built with Node.js, Express, and MongoDB using MVC architecture.
 
 ## Features
 
 - User authentication with JWT
 - Book management (add, list, search)
-- Review system (add, update, delete)
+- Nested review system within books
 - Pagination and filtering
 - Search functionality
 - Input validation
@@ -25,8 +25,9 @@ A RESTful API for managing book reviews built with Node.js, Express, and MongoDB
 - Node.js (v14 or higher)
 - MongoDB
 - npm or yarn
+- Postman (for API testing)
 
-## Setup
+## Project Setup
 
 1. Clone the repository:
 ```bash
@@ -47,136 +48,252 @@ JWT_SECRET=your-secret-key
 NODE_ENV=development
 ```
 
-4. Start the server:
+4. Start MongoDB:
 ```bash
-# Development mode
+# Make sure MongoDB is running on your system
+mongod
+```
+
+5. Start the server:
+```bash
+# Development mode with nodemon
 npm run dev
 
 # Production mode
 npm start
 ```
 
-## API Endpoints
+## Running Locally
 
-### Authentication
+1. Ensure MongoDB is running on your system
+2. Set up environment variables in `.env` file
+3. Install dependencies with `npm install`
+4. Start the server with `npm run dev`
+5. The API will be available at `http://localhost:3000`
+
+## API Examples
+
+### Using cURL
 
 #### Register a new user
-```http
-POST /api/auth/signup
-Content-Type: application/json
-
-{
-  "username": "john_doe",
-  "email": "john@example.com",
-  "password": "password123"
-}
+```bash
+curl -X POST http://localhost:3000/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "john_doe",
+    "email": "john@example.com",
+    "password": "password123"
+  }'
 ```
 
 #### Login
-```http
-POST /api/auth/login
-Content-Type: application/json
+```bash
+curl -X POST http://localhost:3000/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "john@example.com",
+    "password": "password123"
+  }'
+```
 
+#### Add a book (with authentication)
+```bash
+curl -X POST http://localhost:3000/books \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "The Great Gatsby",
+    "author": "F. Scott Fitzgerald",
+    "genre": "Fiction",
+    "description": "A story of the fabulously wealthy Jay Gatsby..."
+  }'
+```
+
+#### Add a review
+```bash
+curl -X POST http://localhost:3000/books/BOOK_ID/reviews \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rating": 5,
+    "comment": "Great book!"
+  }'
+```
+
+### Using Postman
+
+1. Import the following collection into Postman:
+```json
 {
-  "email": "john@example.com",
-  "password": "password123"
+  "info": {
+    "name": "Book Review API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "url": "http://localhost:3000/auth/signup",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"john_doe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "url": "http://localhost:3000/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
 }
 ```
 
-### Books
+## Design Decisions and Assumptions
 
-#### Add a new book (Authenticated)
-```http
-POST /api/books
-Authorization: Bearer <token>
-Content-Type: application/json
+### Architecture
+- Used MVC pattern for better code organization and maintainability
+- Implemented nested reviews within books for better data locality
+- Chose JWT for stateless authentication
 
-{
-  "title": "The Great Gatsby",
-  "author": "F. Scott Fitzgerald",
-  "genre": "Fiction",
-  "description": "A story of the fabulously wealthy Jay Gatsby..."
-}
-```
+### Database Design
+- Embedded reviews within books to reduce query complexity
+- Added indexes for frequently queried fields
+- Implemented compound indexes for unique constraints
 
-#### Get all books
-```http
-GET /api/books?page=1&limit=10&author=Fitzgerald&genre=Fiction
-```
+### Security
+- Passwords are hashed using bcrypt
+- JWT tokens for stateless authentication
+- Input validation using express-validator
+- Environment variables for sensitive data
 
-#### Get book by ID
-```http
-GET /api/books/:id
-```
-
-#### Search books
-```http
-GET /api/books/search?query=gatsby
-```
-
-### Reviews
-
-#### Add a review (Authenticated)
-```http
-POST /api/books/:id/reviews
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "rating": 5,
-  "comment": "Great book!"
-}
-```
-
-#### Update a review (Authenticated)
-```http
-PUT /api/books/:id/reviews/:reviewId
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "rating": 4,
-  "comment": "Updated review"
-}
-```
-
-#### Delete a review (Authenticated)
-```http
-DELETE /api/books/:id/reviews/:reviewId
-Authorization: Bearer <token>
-```
+### Performance
+- Implemented pagination for list endpoints
+- Added text search indexes for efficient searching
+- Used lean queries where appropriate
 
 ## Database Schema
 
-### User
+### User Collection
 ```javascript
 {
-  username: String,
-  email: String,
-  password: String (hashed),
-  createdAt: Date,
-  updatedAt: Date
+  username: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true,
+    lowercase: true
+  },
+  password: {
+    type: String,
+    required: true,
+    minlength: 6
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
 }
 ```
 
-### Book
+### Book Collection
 ```javascript
 {
-  title: String,
-  author: String,
-  genre: String,
-  description: String,
+  title: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  author: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  genre: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  description: {
+    type: String,
+    required: true
+  },
   reviews: [{
-    user: ObjectId (ref: User),
-    rating: Number,
-    comment: String,
-    createdAt: Date,
-    updatedAt: Date
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    rating: {
+      type: Number,
+      required: true,
+      min: 1,
+      max: 5
+    },
+    comment: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+    updatedAt: {
+      type: Date,
+      default: Date.now
+    }
   }],
-  averageRating: Number,
-  totalReviews: Number,
-  createdAt: Date,
-  updatedAt: Date
+  averageRating: {
+    type: Number,
+    default: 0,
+    min: 0,
+    max: 5
+  },
+  totalReviews: {
+    type: Number,
+    default: 0
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
 }
 ```
 
@@ -210,22 +327,6 @@ The API uses standard HTTP status codes:
 - 404: Not Found
 - 500: Internal Server Error
 
-## Security Features
-
-- Passwords are hashed using bcrypt
-- JWT tokens for authentication
-- Input validation using express-validator
-- Environment variables for sensitive data
-- CORS enabled
-- Request rate limiting (optional)
-
-## Development
-
-To run tests:
-```bash
-npm test
-```
-
 ## API Response Format
 
 All API responses follow this format:
@@ -253,4 +354,4 @@ The search endpoint supports:
 
 ## License
 
-MIT 
+@ Vedant Sase
