@@ -354,4 +354,3 @@ The search endpoint supports:
 
 ## License
 
-@ Vedant Sase
